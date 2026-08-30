@@ -1,0 +1,46 @@
+{
+    "name": "mulertech/scanner-ban-bundle",
+    "description": "Symfony bundle banning scanners on what they request, never on what they claim to be",
+    "type": "symfony-bundle",
+    "license": "MIT",
+    "keywords": ["php", "symfony", "bundle", "security", "scanner", "ban", "hardening"],
+    "authors": [
+        {
+            "name": "Sébastien Muler",
+            "email": "sebastien.muler@mulertech.net"
+        }
+    ],
+    "require": {
+        "php": "^8.4",
+        "psr/cache": "^2.0 || ^3.0",
+        "psr/log": "^2.0 || ^3.0",
+        "symfony/config": "^7.0 || ^8.0",
+        "symfony/console": "^7.0 || ^8.0",
+        "symfony/dependency-injection": "^7.0 || ^8.0",
+        "symfony/event-dispatcher": "^7.0 || ^8.0",
+        "symfony/http-foundation": "^7.0 || ^8.0",
+        "symfony/http-kernel": "^7.0 || ^8.0"
+    },
+    "require-dev": {
+        "friendsofphp/php-cs-fixer": "^3.0",
+        "mulertech/docker-dev": "^3.2",
+        "phpstan/phpstan": "^2.0",
+        "phpunit/phpunit": "^12.0",
+        "roave/security-advisories": "dev-latest",
+        "symfony/cache": "^7.0 || ^8.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "MulerTech\\ScannerBan\\": "./src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "MulerTech\\ScannerBan\\Tests\\": "./tests"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "stable"
+}
