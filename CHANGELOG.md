@@ -1,5 +1,19 @@
 # Release notes for scanner-ban-bundle
 
+## v1.0.1 - 2026-08-31
+
+### The loopback is always allowed
+
+A request whose client address is the loopback comes from inside the container: a health check, a post-deployment probe, the application calling itself. It arrives with the User-Agent of whatever tool made the call, `curl` or none at all, which is exactly what the blocklist refuses.
+
+That address is now allowed whatever `allowed_ips` holds, because it is an invariant rather than a setting. Without it, a post-deployment check calling `http://localhost` is answered with a `403` and the deployment reports a failure while the site itself is perfectly healthy.
+
+This exempts no external traffic: a visitor arriving through a reverse proxy carries their own address, provided `framework.trusted_proxies` is set, which the bundle already requires.
+
+### Housekeeping
+
+`phpstan-baseline.neon` no longer ships in the distribution archive. It joins the tooling files already excluded, and its only referent, `phpstan.neon.dist`, was excluded already.
+
 ## v1.0.0 - 2026-08-30
 
 Bans scanners on **what they request**, never on what they claim to be.
@@ -40,5 +54,6 @@ Register it for production, where it has something to judge, and set the route o
 when@prod:
     mulertech_scanner_ban:
         login_route: app_login
+
 
 ```
