@@ -20,6 +20,8 @@ use Symfony\Component\HttpKernel\KernelEvents;
 
 final readonly class ScannerBanSubscriber implements EventSubscriberInterface
 {
+    private const array LOOPBACK = ['127.0.0.0/8', '::1'];
+
     /** @var list<string> */
     private array $allowedIps;
 
@@ -142,6 +144,15 @@ final readonly class ScannerBanSubscriber implements EventSubscriberInterface
 
     private function isAllowedIp(string $ip): bool
     {
+        // The loopback is not configuration, it is an invariant: a request whose client address is
+        // the loopback was issued from inside the container, by a health check, a deployment probe
+        // or the application itself. Such a caller is never the scanner this guards against, and it
+        // reaches the site with the User-Agent of whatever tool made the call, which is exactly what
+        // the blocklist refuses. Leaving it out turns every post-deployment check into a failure.
+        if (IpUtils::checkIp($ip, self::LOOPBACK)) {
+            return true;
+        }
+
         return [] !== $this->allowedIps && IpUtils::checkIp($ip, $this->allowedIps);
     }
 

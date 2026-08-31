@@ -149,6 +149,30 @@ final class ScannerBanSubscriberTest extends TestCase
         self::assertNull($event->getResponse());
     }
 
+    public function testLoopbackIsServedWhateverToolCallsIt(): void
+    {
+        $event = $this->requestEvent('/', '127.0.0.1', 'curl/8.4.0');
+        $this->subscriber(new ArrayAdapter())->onKernelRequest($event);
+
+        self::assertNull($event->getResponse());
+    }
+
+    public function testLoopbackIsServedWithoutAnyUserAgent(): void
+    {
+        $event = $this->requestEvent('/', '::1', '');
+        $this->subscriber(new ArrayAdapter())->onKernelRequest($event);
+
+        self::assertNull($event->getResponse());
+    }
+
+    public function testLoopbackIsNeverCounted(): void
+    {
+        $event = $this->exceptionEvent('/.env', '127.0.0.1', self::BROWSER_UA);
+        $this->subscriber(new ArrayAdapter())->onKernelException($event);
+
+        self::assertNull($event->getResponse());
+    }
+
     public function testMalformedLoginPostAnswersQuietlyWhenItCannotBeBanned(): void
     {
         $logger = $this->createMock(LoggerInterface::class);

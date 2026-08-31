@@ -92,6 +92,11 @@ mulertech_scanner_ban:
 never blocked, and a malformed request coming from one of them **stays loud**: from an address you
 own, it is a client bug worth an alert, and silencing it would hide the only signal there is.
 
+The loopback is always allowed, whatever `allowed_ips` holds. A request whose client address is the
+loopback came from inside the container: a health check, a post-deployment probe, the application
+calling itself. Such a caller arrives with the User-Agent of the tool that made the call, `curl` or
+none at all, which is exactly what the blocklist refuses.
+
 Keep the operational values in the project, not in a shared example. The thresholds published here
 are defaults, so a site that leaves them untouched is a site whose thresholds are public.
 
