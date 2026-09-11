@@ -48,12 +48,12 @@ Behind a reverse proxy, `framework.trusted_proxies` must be set. Without it `get
 
 ```bash
 composer require mulertech/scanner-ban-bundle
+```
 
-Register it for production, where it has something to judge, and set the route of your firewall check_path:
+Register it for production, where it has something to judge, and set the route of your firewall `check_path`:
 
+```yaml
 when@prod:
     mulertech_scanner_ban:
         login_route: app_login
-
-
 ```

@@ -40,6 +40,14 @@ The bundle also answers a rejected probe itself, with an empty `400`, which keep
 channel. An anonymous client error is not an application failure and must not page a human; the
 `warning` it logs instead is the trace it leaves.
 
+## What it is not
+
+It does not replace a Content Security Policy, and it does not need one. A CSP is a set of
+instructions carried out by the visitor's browser while it renders your page. A scanner never
+renders your page, so it never carries them out: the policy has no effect on it whatsoever. The two
+protect different parties, the visitor against injected content and the server against being probed,
+and neither depends on the other.
+
 ## Requirements
 
 - PHP 8.4 or later
