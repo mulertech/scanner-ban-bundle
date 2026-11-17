@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MulerTech\ScannerBan\Ban;
 
+use MulerTech\ScannerBan\Detection\ClientFingerprint;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 
@@ -16,6 +17,7 @@ final readonly class BanRegistry
 {
     public const string SCORE_PREFIX = 'scanner_score_';
     public const string BAN_PREFIX = 'scanner_ban_';
+    public const string SUBNET_PREFIX = 'scanner_subnet_';
     public const string DIGEST_KEY = 'scanner_digest';
 
     public function __construct(
@@ -59,6 +61,11 @@ final readonly class BanRegistry
             }
 
             $this->ban($key);
+
+            if ('fingerprint' === $type) {
+                $this->indexFingerprint($ip, $fingerprint);
+            }
+
             $this->addToDigest($ip, $userAgent, $path);
             $banned = true;
 
@@ -74,16 +81,33 @@ final readonly class BanRegistry
         return $banned;
     }
 
-    public function forget(string $key): void
+    /**
+     * Lifts everything that refuses this address: its own ban, and the fingerprints banned in its
+     * subnet. A fingerprint cannot be rebuilt from the address, since it also carries a User-Agent
+     * nobody typing the command knows, which is why bans leave an index behind them.
+     *
+     * @return bool whether the removal went through, false leaving the address possibly still banned
+     */
+    public function forget(string $ip): bool
     {
         try {
-            $this->cache->deleteItem(self::BAN_PREFIX.$key);
-            $this->cache->deleteItem(self::SCORE_PREFIX.$key);
+            $indexKey = $this->subnetKey($ip);
+
+            foreach ([md5($ip), ...$this->indexedFingerprints($indexKey)] as $key) {
+                $this->cache->deleteItem(self::BAN_PREFIX.$key);
+                $this->cache->deleteItem(self::SCORE_PREFIX.$key);
+            }
+
+            $this->cache->deleteItem($indexKey);
+
+            return true;
         } catch (\Throwable $exception) {
             $this->logger->warning('Scanner ban removal failed.', [
-                'key' => $key,
+                'ip' => $ip,
                 'exception' => $exception,
             ]);
+
+            return false;
         }
     }
 
@@ -158,6 +182,37 @@ final readonly class BanRegistry
                 'exception' => $exception,
             ]);
         }
+    }
+
+    private function indexFingerprint(string $ip, string $fingerprint): void
+    {
+        try {
+            $indexKey = $this->subnetKey($ip);
+            $item = $this->cache->getItem($indexKey);
+            $item->set(array_values(array_unique([...$this->indexedFingerprints($indexKey), $fingerprint])));
+            $item->expiresAfter($this->banDuration);
+            $this->cache->save($item);
+        } catch (\Throwable $exception) {
+            $this->logger->warning('Scanner fingerprint index update failed, lifting the ban of this address will leave the fingerprint banned.', [
+                'ip' => $ip,
+                'exception' => $exception,
+            ]);
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function indexedFingerprints(string $indexKey): array
+    {
+        $fingerprints = $this->cache->getItem($indexKey)->get();
+
+        return \is_array($fingerprints) ? array_values(array_filter($fingerprints, \is_string(...))) : [];
+    }
+
+    private function subnetKey(string $ip): string
+    {
+        return self::SUBNET_PREFIX.md5(ClientFingerprint::subnet($ip));
     }
 
     private function addToDigest(string $ip, string $userAgent, string $path): void

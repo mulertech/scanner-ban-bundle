@@ -14,7 +14,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 #[AsCommand(
     name: 'scanner-ban:unban',
-    description: 'Lifts the ban and the running score of one address',
+    description: 'Lifts the ban of one address, with the fingerprints banned in its subnet',
 )]
 final class ScannerBanUnbanCommand extends Command
 {
@@ -39,7 +39,11 @@ final class ScannerBanUnbanCommand extends Command
             return Command::INVALID;
         }
 
-        $this->registry->forget(md5($ip));
+        if (!$this->registry->forget($ip)) {
+            $io->error(\sprintf('The cache refused the removal: %s may still be banned. The log carries the cause.', $ip));
+
+            return Command::FAILURE;
+        }
 
         $io->success(\sprintf('%s is served again.', $ip));
 

@@ -15,7 +15,10 @@ use Symfony\Component\Cache\Adapter\ArrayAdapter;
 final class BanRegistryTest extends TestCase
 {
     private const string IP = '203.0.113.20';
+    private const string NEIGHBOUR_IP = '203.0.113.77';
+    private const string DISTANT_IP = '198.51.100.20';
     private const string FINGERPRINT = 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4';
+    private const string OTHER_FINGERPRINT = 'ffffffffffffffffffffffffffffffff';
     private const string UA = 'Mozilla/5.0 normal-browser';
 
     public function testScoreBelowThresholdDoesNotBan(): void
@@ -117,9 +120,57 @@ final class BanRegistryTest extends TestCase
         $registry = $this->registry($cache);
         $registry->record(self::IP, self::FINGERPRINT, self::UA, '/.env', 10);
 
-        $registry->forget(md5(self::IP));
+        self::assertTrue($registry->forget(self::IP));
 
         self::assertFalse($registry->isBanned(md5(self::IP)));
+        self::assertFalse($cache->getItem(BanRegistry::SCORE_PREFIX.md5(self::IP))->isHit());
+    }
+
+    public function testForgetLiftsTheFingerprintBannedWithTheAddress(): void
+    {
+        $registry = $this->registry(new ArrayAdapter());
+        $registry->record(self::IP, self::FINGERPRINT, self::UA, '/.env', 10);
+
+        $registry->forget(self::IP);
+
+        self::assertFalse($registry->isBanned(self::FINGERPRINT));
+    }
+
+    public function testForgetLiftsEveryFingerprintBannedInTheSubnet(): void
+    {
+        $registry = $this->registry(new ArrayAdapter());
+        $registry->record(self::IP, self::FINGERPRINT, self::UA, '/.env', 10);
+        $registry->record(self::NEIGHBOUR_IP, self::OTHER_FINGERPRINT, 'Mozilla/5.0 other-browser', '/.git', 10);
+
+        $registry->forget(self::IP);
+
+        self::assertFalse($registry->isBanned(self::FINGERPRINT, self::OTHER_FINGERPRINT));
+    }
+
+    public function testForgetLeavesAnotherSubnetBanned(): void
+    {
+        $registry = $this->registry(new ArrayAdapter());
+        $registry->record(self::IP, self::FINGERPRINT, self::UA, '/.env', 10);
+        $registry->record(self::DISTANT_IP, self::OTHER_FINGERPRINT, self::UA, '/.env', 10);
+
+        $registry->forget(self::IP);
+
+        self::assertTrue($registry->isBanned(md5(self::DISTANT_IP)));
+        self::assertTrue($registry->isBanned(self::OTHER_FINGERPRINT));
+    }
+
+    public function testForgetIgnoresAnIndexThatIsNotAList(): void
+    {
+        $cache = new ArrayAdapter();
+        $index = $cache->getItem(BanRegistry::SUBNET_PREFIX.md5('203.0.113'));
+        $index->set('corrupted');
+        $cache->save($index);
+
+        $registry = $this->registry($cache);
+        $registry->record(self::DISTANT_IP, self::FINGERPRINT, self::UA, '/.env', 10);
+        $registry->forget(self::IP);
+
+        self::assertTrue($registry->isBanned(self::FINGERPRINT));
     }
 
     public function testCacheFailureOnLookupIsLoggedAndServesTheRequest(): void
@@ -171,7 +222,23 @@ final class BanRegistryTest extends TestCase
             ->method('warning')
             ->with('Scanner ban removal failed.', self::anything());
 
-        $this->registry($this->brokenCache(), $logger)->forget('whatever');
+        self::assertFalse($this->registry($this->brokenCache(), $logger)->forget(self::IP));
+    }
+
+    public function testCacheFailureOnFingerprintIndexIsLoggedAndKeepsTheBan(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())
+            ->method('warning')
+            ->with(
+                'Scanner fingerprint index update failed, lifting the ban of this address will leave the fingerprint banned.',
+                self::anything(),
+            );
+
+        $registry = $this->registry(new PartiallyBrokenCache([BanRegistry::SUBNET_PREFIX]), $logger);
+
+        self::assertTrue($registry->record(self::IP, self::FINGERPRINT, self::UA, '/.env', 10));
+        self::assertTrue($registry->isBanned(self::FINGERPRINT));
     }
 
     public function testCacheFailureOnBanWriteIsLoggedAndKeepsServing(): void

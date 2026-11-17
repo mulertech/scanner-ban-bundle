@@ -182,6 +182,9 @@ The bundle carries no schedule of its own, so run the digest from yours. It empt
 php bin/console scanner-ban:digest
 ```
 
+Lifting a ban takes the address alone. It also lifts the fingerprints banned in the subnet of that
+address, since a client refused on its fingerprint stays refused whatever happens to its address:
+
 ```bash
 php bin/console scanner-ban:unban 203.0.113.42
 ```

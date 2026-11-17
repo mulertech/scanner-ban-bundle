@@ -6,6 +6,7 @@ namespace MulerTech\ScannerBan\Tests\Command;
 
 use MulerTech\ScannerBan\Ban\BanRegistry;
 use MulerTech\ScannerBan\Command\ScannerBanUnbanCommand;
+use MulerTech\ScannerBan\Tests\Double\PartiallyBrokenCache;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
@@ -23,8 +24,26 @@ final class ScannerBanUnbanCommandTest extends TestCase
         $tester = new CommandTester(new ScannerBanUnbanCommand($registry));
 
         self::assertSame(Command::SUCCESS, $tester->execute(['ip' => '203.0.113.1']));
-        self::assertFalse($registry->isBanned(md5('203.0.113.1')));
+        self::assertFalse($registry->isBanned(md5('203.0.113.1'), str_repeat('a', 32)));
         self::assertStringContainsString('served again', $tester->getDisplay());
+    }
+
+    public function testItFailsWhenTheCacheRefusesTheRemoval(): void
+    {
+        $registry = new BanRegistry(
+            new PartiallyBrokenCache([BanRegistry::BAN_PREFIX]),
+            new NullLogger(),
+            10,
+            300,
+            86400,
+            172800,
+            500,
+        );
+        $tester = new CommandTester(new ScannerBanUnbanCommand($registry));
+
+        self::assertSame(Command::FAILURE, $tester->execute(['ip' => '203.0.113.1']));
+        self::assertStringContainsString('may still be banned', $tester->getDisplay());
+        self::assertStringNotContainsString('served again', $tester->getDisplay());
     }
 
     public function testItRefusesAnArgumentThatIsNotAnAddress(): void
