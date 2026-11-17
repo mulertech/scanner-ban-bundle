@@ -1,5 +1,16 @@
 # Release notes for scanner-ban-bundle
 
+## v1.1.0 - 2026-11-17
+
+Fixes:
+
+- scanner-ban:unban lifts the fingerprints banned in the subnet of the address, not the address alone. A client banned on a probe stayed refused on its fingerprint after the command reported it served again.
+- scanner-ban:unban exits with a failure when the cache refuses the removal, instead of reporting the address served again.
+
+Changes:
+
+- BanRegistry::forget() takes the address itself instead of its md5 hash, and returns whether the removal went through.
+
 ## v1.0.1 - 2026-08-31
 
 ### The loopback is always allowed
@@ -48,12 +59,13 @@ Behind a reverse proxy, `framework.trusted_proxies` must be set. Without it `get
 
 ```bash
 composer require mulertech/scanner-ban-bundle
-```
 
+```
 Register it for production, where it has something to judge, and set the route of your firewall `check_path`:
 
 ```yaml
 when@prod:
     mulertech_scanner_ban:
         login_route: app_login
+
 ```
